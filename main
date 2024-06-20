@@ -6,6 +6,31 @@ macro_rules! parse_input {
     ($x:expr, $t:ident) => ($x.trim().parse::<$t>().unwrap())
 }
 
+fn get_hurdle_pos(track_str:String, start:i32) -> VecDeque<i32> {
+    let mut hurdles:VecDeque<i32> = VecDeque::new();
+    let mut hurdle_iter = track_str.chars();
+    let mut course_iter: i32 = start;
+    // eprintln!("{:?}", track_str);
+    loop {
+        let ch = hurdle_iter.next();
+        if ch.is_none() {
+            // eprintln!("{:?}", ch);
+            break;
+        }
+        if ch.unwrap() == '1' {
+            // eprintln!("{:?}", ch);
+            hurdles.push_back(course_iter)
+        } 
+        course_iter+=1
+    }    
+    return hurdles
+}
+
+fn bin_str_to_binary(bin_str:String) -> i32 {
+    let binary = i32::from_str_radix(bin_str.as_str(), 2).expect("Not a binary number!");
+    return binary
+}
+
 /**
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
@@ -27,15 +52,15 @@ fn main() {
     // let move_speed: Vec<String> = vec!["UP".to_string(),"LEFT".to_string(),"DOWN".to_string(),"RIGHT".to_string()];
     let move_speed: &[&str] = &["UP", "LEFT", "DOWN", "RIGHT"];
     let mut game_time: i32 = 0;
-    let mut match_counter: i32 = 0;
     let mut place: [usize; 4] = [0,0,0,0];
-    let mut total_dist: [i32; 4] = [0, 0, 0, 0];
     let mut gap: [i32; 4] = [0, 0, 0, 0];
+    let mut binary_track:[i32; 4] = [0, 0, 0, 0];
 
     eprintln!("Game time {}",game_time);
     // game loop
     loop {
         let mut priority: [f32; 4] = [0.0,0.0,0.0,0.0];
+        let mut combined_track: i32 = 0;
         for i in 0..3 as usize {
             let mut input_line = String::new();
             io::stdin().read_line(&mut input_line).unwrap();
@@ -48,7 +73,8 @@ fn main() {
             io::stdin().read_line(&mut input_line).unwrap();
             let inputs = input_line.split(" ").collect::<Vec<_>>();
             // Ascii representation of track . space # hurdle
-            let gpu = inputs[0].trim().to_string();
+            let gpu = inputs[0].trim().replace(".","0").replace("#", "1").to_string();
+            // binary_track[i] = bin_str_to_binary(gpu);
 
             // Player Positions 1, 2, 3
             let reg_0 = parse_input!(inputs[1], i32);
@@ -89,29 +115,12 @@ fn main() {
                 stun_counter[i] += 1;
             }
             
-
-            // Hurdles
-            let mut hurdle_iter = gpu.chars();
-            let mut course_iter: i32 = start;
-            if pos[i] == 0  {
-                loop {
-                    let ch = hurdle_iter.next();
-                    if ch.is_none() {
-                        break;
-                    }
-                    if ch.unwrap() == '#' {
-                        hurdles[i].push_back(course_iter)
-                    } 
-                    course_iter+=1
-                }    
-                if i == 0 {
-                    match_counter += 1;
-                }
-            }
-            // eprintln!("Hurdles {:?}",hurdles[i]);
-            
-            hurdles[i].retain(|&x| x - pos[i] > 0);
+            // hurdle stuff
             let mut hurdle: i32 = -1;
+            if pos[i] == 0  {
+                hurdles[i] = get_hurdle_pos(gpu, start);
+            }
+            hurdles[i].retain(|&x| x - pos[i] > 0);
             if hurdles[i].len() > 0 {
                 hurdle = hurdles[i][0];
             } 
@@ -119,8 +128,8 @@ fn main() {
             if stun_timer[i] > 0 || (end - pos[i]) / 3 > (100 - game_time) || pos[i] == end {
                 priority[i] = 0.0;
             } else {
-                priority[i] = 1.0 / (place[i] as f32);
-                priority[i] /= (end - pos[i] + gap[i]) as f32;
+                priority[i] = 1.0 / (place[i].pow(2) as f32);
+                priority[i] /= (end - pos[i] + gap[i]*2) as f32;
                 // priority[i] *= (1+pos[i]) as f32;
                 // eprintln!("{}", priority[i]);
             }
@@ -130,50 +139,57 @@ fn main() {
             } else {
                 dist[i] = end - pos[i];
             }
-            // eprintln!("Match {}",match_counter);
-            // eprintln!("Game time {}",game_time);
-            // eprintln!("Player {}",player_idx);
-            // eprintln!("Place {}",place[i]);
-            // eprintln!("Hurdle {}",hurdle);
-            // eprintln!("Distance {}",dist[i]);
-            // eprintln!("Position {}",pos[i]);
-            // eprintln!("Stunned for {}",stun_timer[i]);
-            // eprintln!("Stun counter {}",stun_counter[i]);
-            total_dist[i] = (match_counter-1) * end + pos[i];
-            // eprintln!("Total Distance {}", total_dist[i]);
         }
-        let mut index = 3 as usize;
+        // Combined track;
+        // combined_track = binary_track.iter().sum();
+        // for track in binary_track {
+        //     let binstr_track:String = String::from(format!("{track:b}"));
+        //     let track_hurdles:VecDeque<i32> = get_hurdle_pos(binstr_track, start);
+        // }
+        // let binstr_combined_track:String = String::from(format!("{combined_track:b}"));
+        // let combined_hurdles:VecDeque<i32> = get_hurdle_pos(binstr_combined_track, start);
+
+        // Get priority
+        let mut index = 4 as usize;
         let total_priority:f32 = priority.iter().sum();
         let scaled_priority:[f32;4] = priority.map(|x:f32| x/total_priority);
         let min_dist:i32 = *dist.iter().min().unwrap();
         let max_dist:i32 = *dist.iter().max().unwrap();
-        let mut intermediate_dist:Vec<f32> = vec![min_dist as f32,0.0];
+        let mut intermediate_dist:i32 = min_dist;
+        let mut intermediate_priority:f32 = 0.0;
         let mut m: HashMap<i32, usize> = HashMap::new();
         for d in dist {
+            if d >= 3 && dist.contains(&1) {
+                *m.entry(1).or_default() += 1;    
+            }
             *m.entry(d).or_default() += 1;
         }
-        eprintln!("{:?}",m);
         let counts: HashMap<i32, usize> = m.into_iter().filter(|(_,v)| *v>1).collect();
         let mut common_dist = min_dist;
         if counts.len() >= 1 {
             common_dist = counts.into_iter().max_by_key(|(_, v)| *v).map(|(k, _)| k).unwrap();
         }
         for (&p,&d) in scaled_priority.iter().zip(dist.iter()) {
-            let mut priority = p;
-            if d == common_dist {
+            let mut priority:f32 = p;
+            let mut distance:i32 = d;
+            if distance == common_dist {
+                priority *= 2.0;
+            } else if distance >= 3 && common_dist == 1 {
+                distance = 1;
                 priority *= 2.0;
             }
-            if priority > intermediate_dist[1] {
-                intermediate_dist = vec![d as f32, p];
+            if priority > intermediate_priority {
+                intermediate_dist = distance;
+                intermediate_priority = priority;
             }
         }
         //     intermediate_dist += (d - min_dist) as f32 * p;
-        let priority_dist:i32 = intermediate_dist[0].round() as i32;
-        eprintln!("Match {}",match_counter);
+        let priority_dist:i32 = intermediate_dist;
         eprintln!("Game time {}",game_time);
         eprintln!("Player {}",player_idx);
         eprintln!("Place {:?}",place);
         eprintln!("Gap {:?}",gap);
+        eprintln!("Hurdles {:?}",hurdles);
         eprintln!("Distance {:?}",dist);
         eprintln!("min_dist {}",min_dist);
         eprintln!("max_dist {}",max_dist);
@@ -183,12 +199,7 @@ fn main() {
         eprintln!("Position {:?}",pos);
         eprintln!("Stunned for {:?}",stun_timer);
         eprintln!("Stun counter {:?}",stun_counter);
-        eprintln!("Total Distance {:?}", total_dist);
-        if priority_dist <= 3 && priority_dist > 0 {
-            index = priority_dist as usize;
-            index -= 1;
-        } 
-        // index = common_dist.clamp(1, 3) as usize - 1;
+        index = priority_dist.clamp(1, 4) as usize - 1;
         // index = min_dist.clamp(1, 3) as usize - 1;
         let direction: String = move_speed[index].to_string();
         // Write an action using println!("message...");
